@@ -53,51 +53,57 @@ def calculate_company_car_tax():
         total_annual_tax = tax_payable + fuel_tax_payable
         total_monthly_tax = total_annual_tax / 12
 
-        # Additional Information Section
-        additional_info = """
+        # Email-friendly formatted results
+        results = f"""
+        Subject: Company Car Tax Calculation Results
+
+        Company Car Tax Calculation Results
+        ------------------------------------
+
+        Car Details:
+        - Make and Model: {car_make_model}
+        - CO2 Emissions: {co2_emissions} g/km
+        - P11D Value: £{p11d_value:.2f}
+
+        Tax Details:
+        - Personal Tax Rate: {tax_rate}%
+        - BiK Rate: {bik_rate}%
+        - Taxable Benefit Calculation: £{p11d_value} * {bik_rate}% = £{taxable_benefit:.2f}
+        - Annual Company Car Tax: £{taxable_benefit} * {tax_rate}% = £{tax_payable:.2f}
+        - Monthly Company Car Tax: £{tax_payable / 12:.2f}
+        """
+
+        if include_fuel:
+            results += f"""
+        Fuel Benefit (if applicable):
+        - Fuel Multiplier: £{fuel_multiplier}
+        - Fuel Benefit Calculation: £{fuel_multiplier} * {bik_rate}% = £{fuel_benefit:.2f}
+        - Annual Fuel Tax Payable: £{fuel_benefit} * {tax_rate}% = £{fuel_tax_payable:.2f}
+        - Monthly Fuel Tax Payable: £{fuel_tax_payable / 12:.2f}
+        """
+
+        results += f"""
+        Total Tax Payable:
+        - Total Annual Tax Payable: £{total_annual_tax:.2f}
+        - Total Monthly Tax Payable: £{total_monthly_tax:.2f}
+
         Additional Information:
         -----------------------
         - P11D Value: The list price of the car including VAT and any delivery charges, but excluding the first year registration fee and vehicle tax.
         - BiK Rate: The Benefit-in-Kind rate is a percentage applied to the P11D value to determine the taxable benefit.
         - CO2 Emissions: The amount of carbon dioxide emitted by the car, measured in grams per kilometer.
         - Fuel Benefit: An additional taxable benefit if the employer provides fuel for private use.
+        - Note: This calculation assumes the car is used for the entire tax year.
+
+        Sources:
+        - {co2_source}
+        - {fuel_source}
         """
 
-        results = f"""
-        Company Car Tax Calculation Results:
-        ------------------------------------
-        Car Make and Model: {car_make_model}
-        CO2 Emissions: {co2_emissions} g/km
-        P11D Value: £{p11d_value:.2f}
-        Personal Tax Rate: {tax_rate}%
-        BiK Rate: {bik_rate}%
-        Taxable Benefit Calculation: £{p11d_value} * {bik_rate}% = £{taxable_benefit:.2f}
-        Annual Company Car Tax: £{taxable_benefit} * {tax_rate}% = £{tax_payable:.2f}
-        Monthly Company Car Tax: £{tax_payable / 12:.2f}
-        """
-
-        if include_fuel:
-            results += f"""
-        Fuel Multiplier: £{fuel_multiplier}
-        Fuel Benefit Calculation: £{fuel_multiplier} * {bik_rate}% = £{fuel_benefit:.2f}
-        Annual Fuel Tax Payable: £{fuel_benefit} * {tax_rate}% = £{fuel_tax_payable:.2f}
-        Monthly Fuel Tax Payable: £{fuel_tax_payable / 12:.2f}
-        """
-
-        results += f"""
-        Total Annual Tax Payable: £{total_annual_tax:.2f}
-        Total Monthly Tax Payable: £{total_monthly_tax:.2f}
-        """
-
-        # Combine results and additional information
-        full_message = results + additional_info
-
-        print(full_message)
+        print(results)
 
         with open("company_car_tax_results.txt", "w") as file:
-            file.write(co2_source + "\n")
-            file.write(fuel_source + "\n")
-            file.write(full_message)
+            file.write(results)
 
     except ValueError as e:
         print(f"Input error: {e}. Please enter valid numbers for CO2 emissions, P11D value, and tax rate.")
@@ -145,5 +151,16 @@ def determine_bik_rate(co2_emissions, electric_range, is_phev):
 
 def calculate_fuel_benefit(fuel_multiplier, bik_rate):
     return fuel_multiplier * (bik_rate / 100)
+
+# Comments on Van Tax
+"""
+Van Tax Information:
+--------------------
+- Van Benefit Charge: This is a fixed amount that is taxed as a benefit-in-kind. For the 2023/24 tax year, the van benefit charge is £3,600.
+- Fuel Benefit Charge: If an employer provides fuel for private use, an additional fixed charge applies. For the 2023/24 tax year, this is £688.
+- Electric Vans: Electric vans are subject to a reduced benefit charge, often significantly lower than traditional vans.
+- Tax Calculation: The tax payable is calculated by applying the employee's income tax rate to the van benefit charge and any applicable fuel benefit charge.
+- Note: These values are subject to change annually based on government policy updates.
+"""
 
 calculate_company_car_tax()
