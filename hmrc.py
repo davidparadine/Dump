@@ -19,23 +19,42 @@ def calculate_company_car_tax():
 
     try:
         car_make_model = input("Enter the car make and model: ")
-        co2_emissions = int(input("Enter the CO2 emissions (in g/km): "))
         p11d_value = float(input("Enter the P11D value of the car: "))
         tax_rate = int(input("Enter your personal income tax rate (20, 40, or 45): "))
         
         # Input for the date when the car was received in UK format
-        car_received_date_str = input("Enter the date when you received the car (DD/MM/YYYY): ")
-        car_received_date = datetime.datetime.strptime(car_received_date_str, "%d/%m/%Y").date()
+        car_received_date_str = input("Enter the date when you received the car (DD/MM/YYYY) or leave blank for full year use: ").strip()
+        
+        if car_received_date_str:
+            car_received_date = datetime.datetime.strptime(car_received_date_str, "%d/%m/%Y").date()
+            # Calculate the number of days the car is used in the tax year
+            tax_year_end_date = datetime.date(current_tax_year + 1, 4, 5)
+            days_used = (tax_year_end_date - car_received_date).days
+        else:
+            # Assume full year use
+            days_used = 365
+            # Initialize car_received_date to the start of the tax year
+            car_received_date = datetime.date(current_tax_year, 4, 6)
+            # Initialize tax_year_end_date for full year use
+            tax_year_end_date = datetime.date(current_tax_year + 1, 4, 5)
 
-        # Calculate the number of days the car is used in the tax year
-        tax_year_end_date = datetime.date(current_tax_year + 1, 4, 5)
-        days_used = (tax_year_end_date - car_received_date).days
         print(f"Days the car is used: {days_used}")
 
-        is_phev = input("Is the car a plug-in hybrid electric vehicle (PHEV)? (yes/no): ").strip().lower() == 'yes'
+        # Ask if the car is purely electric
+        is_pure_electric = input("Is the car purely electric? (yes/no): ").strip().lower() == 'yes'
+
+        # If the car is not purely electric, ask for CO2 emissions
+        co2_emissions = 0
+        if not is_pure_electric:
+            co2_emissions = int(input("Enter the CO2 emissions (in g/km): "))
+
+        # Ask if the car is a plug-in hybrid electric vehicle (PHEV)
+        is_phev = False
         electric_range = 0
-        if is_phev:
-            electric_range = int(input("Enter the electric-only range in miles: "))
+        if not is_pure_electric:
+            is_phev = input("Is the car a plug-in hybrid electric vehicle (PHEV)? (yes/no): ").strip().lower() == 'yes'
+            if is_phev:
+                electric_range = int(input("Enter the electric-only range in miles: "))
 
         bik_rate = determine_bik_rate(co2_emissions, electric_range, is_phev)
         print(f"Determined BiK Rate: {bik_rate}% based on CO2 emissions and electric range.")
@@ -56,64 +75,108 @@ def calculate_company_car_tax():
         pro_rata_tax = full_year_tax * proportion_of_year
         print(f"Pro-Rata Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{pro_rata_tax:.2f}")
 
-        include_fuel = input("Do you want to include the fuel benefit? (yes/no): ").strip().lower() == 'yes'
+        include_fuel = False
         fuel_benefit = 0
         fuel_tax = 0
 
-        if include_fuel:
-            fuel_multiplier = get_fuel_multiplier()
-            fuel_benefit = calculate_fuel_benefit(fuel_multiplier, bik_rate)
-            print(f"Fuel Benefit: £{fuel_benefit:.2f} (Fuel Multiplier: £{fuel_multiplier} * BiK Rate: {bik_rate}%)")
+        if not is_pure_electric:
+            include_fuel = input("Do you want to include the fuel benefit? (yes/no): ").strip().lower() == 'yes'
+            if include_fuel:
+                fuel_multiplier = get_fuel_multiplier()
+                fuel_benefit = calculate_fuel_benefit(fuel_multiplier, bik_rate)
+                print(f"Fuel Benefit: £{fuel_benefit:.2f} (Fuel Multiplier: £{fuel_multiplier} * BiK Rate: {bik_rate}%)")
 
-            # Calculate full-year fuel tax
-            full_year_fuel_tax = fuel_benefit * (tax_rate / 100)
-            print(f"Full-Year Fuel Tax: £{full_year_fuel_tax:.2f}")
+                # Calculate full-year fuel tax
+                full_year_fuel_tax = fuel_benefit * (tax_rate / 100)
+                print(f"Full-Year Fuel Tax: £{full_year_fuel_tax:.2f}")
 
-            # Calculate pro-rata fuel tax
-            fuel_tax = full_year_fuel_tax * proportion_of_year
-            print(f"Pro-Rata Fuel Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{fuel_tax:.2f}")
+                # Calculate pro-rata fuel tax
+                fuel_tax = full_year_fuel_tax * proportion_of_year
+                print(f"Pro-Rata Fuel Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{fuel_tax:.2f}")
 
-        total_annual_tax = pro_rata_tax + fuel_tax
+        # Ask if the user has a company van
+        has_company_van = input("Do you have a company van? (yes/no): ").strip().lower() == 'yes'
+        van_tax = 0
+        van_fuel_tax = 0
+
+        if has_company_van:
+            is_zero_emission = input("Is the van zero-emission? (yes/no): ").strip().lower() == 'yes'
+            van_tax, van_fuel_tax = calculate_van_tax(tax_rate, include_fuel, is_zero_emission)
+            print(f"Company Van Tax: £{van_tax:.2f}")
+            if include_fuel:
+                print(f"Company Van Fuel Tax: £{van_fuel_tax:.2f}")
+
+        total_annual_tax = pro_rata_tax + fuel_tax + van_tax + (van_fuel_tax if has_company_van and include_fuel else 0)
 
         # Simplified summary
         summary = f"""
-        Company Car Tax Summary for {current_tax_year}/{current_tax_year + 1}
-        -----------------------
-        Total Full-Year Tax: £{full_year_tax + (full_year_fuel_tax if include_fuel else 0):.2f}
+        ================================
+        Company Car and Van Tax Summary for {current_tax_year}/{current_tax_year + 1}
+        ================================
+        Total Full-Year Tax: £{full_year_tax + (full_year_fuel_tax if include_fuel else 0) + van_tax + (van_fuel_tax if include_fuel else 0):.2f}
         Total Pro-Rata Tax: £{total_annual_tax:.2f}
         """
 
         # Detailed calculations
         details = f"""
-        Detailed Company Car Tax Calculation for {current_tax_year}/{current_tax_year + 1}
-        ------------------------------------
+        ==========================================
+        Detailed Company Car and Van Tax Calculation
+        ==========================================
 
         Car Details:
+        ------------
         - Make and Model: {car_make_model}
         - CO2 Emissions: {co2_emissions} g/km
         - P11D Value: £{p11d_value:.2f}
 
-        Tax Details:
+        Car Tax Details:
+        ----------------
         - Personal Tax Rate: {tax_rate}%
         - BiK Rate: {bik_rate}%
         - Taxable Benefit Calculation: £{p11d_value} * {bik_rate}% = £{taxable_benefit:.2f}
-        - Full-Year Tax: £{full_year_tax:.2f}
-        - Pro-Rata Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{pro_rata_tax:.2f}
+        - Full-Year Car Tax: £{full_year_tax:.2f}
+        - Pro-Rata Car Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{pro_rata_tax:.2f}
         """
 
         if include_fuel:
             details += f"""
-        Fuel Benefit (if applicable):
+        Car Fuel Benefit (if applicable):
+        ---------------------------------
         - Fuel Multiplier: £{fuel_multiplier}
         - Fuel Benefit Calculation: £{fuel_multiplier} * {bik_rate}% = £{fuel_benefit:.2f}
-        - Full-Year Fuel Tax: £{full_year_fuel_tax:.2f}
-        - Pro-Rata Fuel Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{fuel_tax:.2f}
+        - Full-Year Car Fuel Tax: £{full_year_fuel_tax:.2f}
+        - Pro-Rata Car Fuel Tax (from {car_received_date.strftime('%d/%m/%Y')} to {tax_year_end_date.strftime('%d/%m/%Y')}): £{fuel_tax:.2f}
         """
 
+        if has_company_van:
+            details += f"""
+        Van Tax (if applicable):
+        ------------------------
+        - Van Benefit Charge: £{3960 if not is_zero_emission else 0}
+        - Van Tax Calculation: £{3960 if not is_zero_emission else 0} * {tax_rate}% = £{van_tax:.2f}
+        """
+
+            if include_fuel:
+                details += f"""
+        Van Fuel Benefit (if applicable):
+        ---------------------------------
+        - Van Fuel Benefit Charge: £757
+        - Van Fuel Tax Calculation: £757 * {tax_rate}% = £{van_fuel_tax:.2f}
+        """
+
+        # Calculate total full-year and pro-rata taxes
+        total_full_year_car_tax = full_year_tax + (full_year_fuel_tax if include_fuel else 0)
+        total_full_year_van_tax = van_tax + (van_fuel_tax if include_fuel else 0)
+        total_pro_rata_car_tax = pro_rata_tax + (fuel_tax if include_fuel else 0)
+        total_pro_rata_van_tax = van_tax + (van_fuel_tax if include_fuel else 0)
+
         details += f"""
-        Total Tax:
-        - Total Full-Year Tax: £{full_year_tax + (full_year_fuel_tax if include_fuel else 0):.2f}
-        - Total Pro-Rata Tax: £{total_annual_tax:.2f}
+        Total Tax Breakdown:
+        --------------------
+        - Total Full-Year Car Tax: £{total_full_year_car_tax:.2f}
+        - Total Full-Year Van Tax: £{total_full_year_van_tax:.2f}
+        - Total Pro-Rata Car Tax: £{total_pro_rata_car_tax:.2f}
+        - Total Pro-Rata Van Tax: £{total_pro_rata_van_tax:.2f}
 
         Additional Information:
         -----------------------
@@ -123,11 +186,12 @@ def calculate_company_car_tax():
         - Fuel Benefit: An additional taxable benefit if the employer provides fuel for private use.
 
         Sources:
+        --------
         - {co2_source}
         - {fuel_source}
         """
 
-        # Write to file
+        # Write to fileuestio
         with open("company_car_tax_results.txt", "w") as file:
             file.write(summary)
             file.write("\n\n")
@@ -190,16 +254,17 @@ def get_fuel_multiplier():
 def calculate_fuel_benefit(fuel_multiplier, bik_rate):
     return fuel_multiplier * (bik_rate / 100)
 
-# Comments on Van Tax
-"""
-Van Tax Information:
---------------------
-- Van Benefit Charge: This is a fixed amount that is taxed as a benefit-in-kind. For the 2023/24 tax year, the van benefit charge is £3,600.
-- Fuel Benefit Charge: If an employer provides fuel for private use, an additional fixed charge applies. For the 2023/24 tax year, this is £688.
-- Van Fuel Charge: This is an additional charge if the employer provides fuel for private use in a van. For the 2023/24 tax year, this charge is £688.
-- Electric Vans: Electric vans are subject to a reduced benefit charge, often significantly lower than traditional vans.
-- Tax Calculation: The tax payable is calculated by applying the employee's income tax rate to the van benefit charge and any applicable fuel benefit charge.
-- Note: These values are subject to change annually based on government policy updates.
-"""
+def calculate_van_tax(tax_rate, include_fuel, is_zero_emission=False):
+    # Van Benefit Charge (VBC) for 2023/24
+    van_benefit_charge = 3960 if not is_zero_emission else 0
+
+    # Calculate the van tax based on the employee's income tax rate
+    van_tax = van_benefit_charge * (tax_rate / 100)
+
+    # Van Fuel Benefit for 2023/24
+    van_fuel_benefit_charge = 757 if include_fuel else 0
+    van_fuel_tax = van_fuel_benefit_charge * (tax_rate / 100)
+
+    return van_tax, van_fuel_tax
 
 calculate_company_car_tax()
